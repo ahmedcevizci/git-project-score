@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Include Spring Boot defaults -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- Define properties -->
+    <property name="LOG_FILE"
+              value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}/}git-project-score.log}"/>
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} ${LOG_LEVEL_PATTERN:-%5p} ${PID:- } --- [%t] %-40.40logger{39} : %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+
+    <!-- Console Appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- File Appender with Rolling Policy -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_FILE}</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_FILE}.%d{yyyy-MM-dd}.%i.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <!-- Async Appender for better performance -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+    </appender>
+
+    <!-- Spring Profile: Development -->
+    <springProfile name="dev | default">
+        <!-- Application package logging -->
+        <logger name="tech.alaz.git.project.score" level="DEBUG"/>
+
+        <!-- GitHub API client logging -->
+        <logger name="tech.alaz.git.project.score.github.client" level="DEBUG"/>
+
+        <!-- Scoring strategy logging -->
+        <logger name="tech.alaz.git.project.score.domain.score.strategy" level="DEBUG"/>
+
+        <!-- Service layer logging -->
+        <logger name="tech.alaz.git.project.score.github.service" level="DEBUG"/>
+
+        <!-- Controller logging -->
+        <logger name="tech.alaz.git.project.score.api" level="DEBUG"/>
+
+        <!-- Spring Framework -->
+        <logger name="org.springframework.web" level="INFO"/>
+        <logger name="org.springframework.web.reactive" level="DEBUG"/>
+        <logger name="org.springframework.graphql" level="DEBUG"/>
+
+        <!-- Reduce noise from Spring Boot -->
+        <logger name="org.springframework.boot.actuate" level="INFO"/>
+        <logger name="org.springframework.boot.autoconfigure" level="INFO"/>
+
+        <!-- Root logger -->
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="ASYNC_FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- Spring Profile: Test -->
+    <springProfile name="test">
+        <!-- Application package logging -->
+        <logger name="tech.alaz.git.project.score" level="DEBUG"/>
+
+        <!-- Reduce test noise -->
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.springframework.test" level="INFO"/>
+
+        <!-- Root logger -->
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <!-- Specific loggers for troubleshooting -->
+    <!-- Uncomment these when debugging specific issues -->
+    <!--
+    <logger name="tech.alaz.git.project.score.github.client.graphql" level="TRACE"/>
+    <logger name="tech.alaz.git.project.score.github.client.rest" level="TRACE"/>
+    <logger name="org.springframework.web.reactive.function.client" level="DEBUG"/>
+    <logger name="reactor.netty" level="DEBUG"/>
+    -->
+
+</configuration>

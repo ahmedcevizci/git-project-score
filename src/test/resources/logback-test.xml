@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Simple console pattern for tests -->
+    <property name="CONSOLE_LOG_PATTERN" value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <!-- Console Appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- Application package logging - DEBUG for tests -->
+    <logger name="tech.alaz.git.project.score" level="DEBUG"/>
+
+    <!-- Test-specific loggers -->
+    <logger name="tech.alaz.git.project.score.domain.score" level="DEBUG"/>
+    <logger name="tech.alaz.git.project.score.domain.score.strategy" level="DEBUG"/>
+    <logger name="tech.alaz.git.project.score.github.client" level="DEBUG"/>
+    <logger name="tech.alaz.git.project.score.github.service" level="DEBUG"/>
+    <logger name="tech.alaz.git.project.score.api" level="DEBUG"/>
+
+    <!-- Reduce noise from Spring during tests -->
+    <logger name="org.springframework" level="WARN"/>
+    <logger name="org.springframework.test" level="INFO"/>
+    <logger name="org.springframework.boot.test" level="INFO"/>
+    <logger name="org.springframework.web" level="WARN"/>
+
+    <!-- Reduce noise from test containers if used -->
+    <logger name="org.testcontainers" level="INFO"/>
+    <logger name="com.github.dockerjava" level="WARN"/>
+    <logger name="tc" level="INFO"/>
+
+    <!-- Hibernate/JPA (if added later) -->
+    <logger name="org.hibernate" level="WARN"/>
+
+    <!-- Root logger for tests -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

@@ -1,0 +1,75 @@
+meta {
+  name: Search GitHub Repositories
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/search?language=Java&creationDate=01-01-2024&pageSize=5&searchInNames=GPT
+  body: none
+  auth: none
+}
+
+params:query {
+  language: Java
+  creationDate: 01-01-2024
+  pageSize: 5
+  searchInNames: GPT
+  ~cursor: 
+}
+
+docs {
+  # Search and Score GitHub Repositories
+  
+  Search for GitHub repositories by language and creation date, with scoring based on popularity metrics.
+  
+  ## Required Parameters
+  - `language`: Programming language (e.g., Java, Python, JavaScript)
+  - `creationDate`: Repository creation date in format dd-MM-yyyy
+  - `pageSize`: Number of results per page (max depends on server configuration)
+  
+  ## Optional Parameters
+  - `cursor`: Pagination cursor for next page
+  - `searchInNames`: Search keyword in repository names (max 20 characters)
+  
+  ## Example Response
+  ```json
+  {
+    "totalResultCount": 1000,
+    "maxStarGazersCount": 50000,
+    "maxForkCount": 10000,
+    "pageInfo": {
+      "hasNextPage": true,
+      "hasPreviousPage": false,
+      "startCursor": "...",
+      "endCursor": "..."
+    },
+    "githubRepositories": [
+      {
+        "repository": {
+          "name": "example-repo",
+          "description": "An example repository",
+          "htmlUrl": "https://github.com/user/example-repo",
+          "primaryLanguage": "Java",
+          "createdAt": "2024-01-01T00:00:00Z",
+          "updatedAt": "2024-10-10T00:00:00Z",
+          "pushedAt": "2024-10-10T00:00:00Z",
+          "stargazerCount": 1000,
+          "watcherCount": 50,
+          "forkCount": 200,
+          "isFork": false,
+          "isArchived": false,
+          "isDisabled": false,
+          "licenseName": "MIT License"
+        },
+        "score": {
+          "totalScore": 85,
+          "recencyScore": 90,
+          "starGazersScore": 80,
+          "forksScore": 75
+        }
+      }
+    ]
+  }
+  ```
+}

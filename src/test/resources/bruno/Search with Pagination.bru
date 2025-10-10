@@ -1,0 +1,27 @@
+meta {
+  name: Search with Pagination
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/search?language=Python&creationDate=15-06-2023&pageSize=3&cursor=Y3Vyc29yOjE
+  body: none
+  auth: none
+}
+
+params:query {
+  language: Python
+  creationDate: 15-06-2023
+  pageSize: 3
+  cursor: Y3Vyc29yOjE
+  ~searchInNames:
+}
+
+docs {
+  # Search with Pagination
+
+  Example of using pagination cursor to fetch next page of results.
+
+  Use the `endCursor` value from the previous response as the `cursor` parameter.
+}
