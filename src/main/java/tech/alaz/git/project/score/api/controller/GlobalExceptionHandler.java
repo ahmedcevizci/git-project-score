@@ -2,13 +2,14 @@ package tech.alaz.git.project.score.api.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
-import org.springframework.web.server.ServerWebInputException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import tech.alaz.git.project.score.api.controller.exception.CreationDateCannotBeInFutureException;
 import tech.alaz.git.project.score.api.controller.exception.PageSizeCannotExceedMaxValueException;
 
@@ -37,11 +38,17 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    @ExceptionHandler(ServerWebInputException.class)
-    public ResponseEntity<Map<String, Object>> handleServerWebInputException(ServerWebInputException ex) {
-        logger.warn("Invalid input");
-        String message = ex.getReason() != null ? ex.getReason() : "Invalid input parameter";
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException ex) {
+        logger.warn("Invalid input for parameter '{}'", ex.getName());
+        String message = "Invalid value for parameter '" + ex.getName() + "'";
         return buildErrorResponse(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        logger.warn("Missing required parameter '{}'", ex.getParameterName());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -59,15 +66,8 @@ public class GlobalExceptionHandler {
         errorResponse.put("status", HttpStatus.BAD_REQUEST.value());
         errorResponse.put("error", "Validation Failed");
 
-        List<String> validationErrors = ex.getAllValidationResults().stream()
-                .flatMap(result -> result.getResolvableErrors().stream())
-                .map(error -> {
-                    if (error instanceof FieldError) {
-                        FieldError fieldError = (FieldError) error;
-                        return fieldError.getField() + ": " + fieldError.getDefaultMessage();
-                    }
-                    return error.getDefaultMessage();
-                })
+        List<String> validationErrors = ex.getAllErrors().stream()
+                .map(MessageSourceResolvable::getDefaultMessage)
                 .collect(Collectors.toList());
 
         errorResponse.put("validationErrors", validationErrors);
@@ -75,7 +75,6 @@ public class GlobalExceptionHandler {
         logger.warn("Invalid argument(s): {}", validationErrors);
         return ResponseEntity.badRequest().body(errorResponse);
     }
-
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {

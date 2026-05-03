@@ -4,9 +4,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.springframework.graphql.client.HttpGraphQlClient;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.graphql.client.GraphQlClient;
+import org.springframework.graphql.client.HttpSyncGraphQlClient;
+import org.springframework.web.client.RestClient;
 import tech.alaz.git.project.score.api.controller.dto.ScoredGitHubRepoSearchResponseDto;
 import tech.alaz.git.project.score.domain.score.strategy.DefaultScoringStrategy;
 import tech.alaz.git.project.score.domain.score.strategy.ScoringStrategy;
@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -25,25 +26,27 @@ import static org.mockito.Mockito.*;
 class GitHubRepoSearchServiceTest {
 
     @Mock
-    private HttpGraphQlClient gitHubGraphQlClient;
+    private HttpSyncGraphQlClient gitHubGraphQlClient;
 
     @Mock
-    private WebClient gitHubRestWebClient;
+    private GraphQlClient.RequestSpec requestSpec;
 
     @Mock
-    private HttpGraphQlClient.RequestSpec requestSpec;
+    private GraphQlClient.RetrieveSyncSpec retrieveSpec;
 
     @Mock
-    private HttpGraphQlClient.RetrieveSpec retrieveSpec;
+    private RestClient gitHubRestWebClient;
 
     @Mock
-    private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
+    @SuppressWarnings("rawtypes")
+    private RestClient.RequestHeadersUriSpec requestHeadersUriSpec;
 
     @Mock
-    private WebClient.RequestHeadersSpec requestHeadersSpec;
+    @SuppressWarnings("rawtypes")
+    private RestClient.RequestHeadersSpec requestHeadersSpec;
 
     @Mock
-    private WebClient.ResponseSpec responseSpec;
+    private RestClient.ResponseSpec responseSpec;
 
     private GitHubRepoSearchService service;
     private final int maxPageSize = 5;
@@ -62,8 +65,12 @@ class GitHubRepoSearchServiceTest {
 
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of()));
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
+                "repositoryCount", 0,
+                "edges", List.of(),
+                "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
+        ));
 
         service.searchGitHubReposViaGraphQl(searchTerm, language, createdAfter, 10, null);
 
@@ -73,10 +80,8 @@ class GitHubRepoSearchServiceTest {
 
     @Test
     void shouldThrowExceptionWhenNoSearchParametersProvided() {
-        Mono<GitHubGraphQlSearchResponseDto> result =
-                service.searchGitHubReposViaGraphQl(null, null, null, 10, null);
-
-        assertThrows(GitHubGraphQlClientException.class, result::block);
+        assertThrows(GitHubGraphQlClientException.class, () ->
+                service.searchGitHubReposViaGraphQl(null, null, null, 10, null));
     }
 
     @Test
@@ -86,14 +91,14 @@ class GitHubRepoSearchServiceTest {
 
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of(
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
                 "repositoryCount", 0,
                 "edges", List.of(),
                 "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
-        )));
+        ));
 
-        Mono<GitHubGraphQlSearchResponseDto> result =
+        GitHubGraphQlSearchResponseDto result =
                 service.searchGitHubReposViaGraphQl(null, language, createdAfter, 10, null);
 
         assertNotNull(result);
@@ -106,14 +111,14 @@ class GitHubRepoSearchServiceTest {
 
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of(
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
                 "repositoryCount", 0,
                 "edges", List.of(),
                 "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
-        )));
+        ));
 
-        Mono<GitHubGraphQlSearchResponseDto> result =
+        GitHubGraphQlSearchResponseDto result =
                 service.searchGitHubReposViaGraphQl(null, "Java", createdAfter, 10, null);
 
         assertNotNull(result);
@@ -123,8 +128,8 @@ class GitHubRepoSearchServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldSearchAndScoreGitHubReposSuccessfully() {
-        // Setup test data
         LocalDate createdAfter = LocalDate.of(2020, 1, 1);
         Instant now = Instant.now();
 
@@ -142,11 +147,10 @@ class GitHubRepoSearchServiceTest {
                 ))
         );
 
-        // Setup mocks for GraphQL
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of(
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
                 "repositoryCount", 1,
                 "edges", List.of(Map.of("node", Map.of(
                         "name", "test-repo",
@@ -159,22 +163,18 @@ class GitHubRepoSearchServiceTest {
                         "isDisabled", false
                 ))),
                 "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
-        )));
+        ));
 
-        // Setup mocks for REST API (max values)
         when(gitHubRestWebClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri(any(java.util.function.Function.class))).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri(any(Function.class))).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(mockRestResponse));
+        when(responseSpec.body(Map.class)).thenReturn(mockRestResponse);
 
         ScoringStrategy strategy = new DefaultScoringStrategy();
 
-        // Execute
-        Mono<ScoredGitHubRepoSearchResponseDto> result =
+        ScoredGitHubRepoSearchResponseDto response =
                 service.searchAndScoreGitHubRepos("test", "Java", createdAfter, 10, null, strategy);
 
-        // Verify
-        ScoredGitHubRepoSearchResponseDto response = result.block();
         assertNotNull(response);
         assertEquals(1, response.totalResultCount());
         assertEquals(100, response.maxStarGazersCount());
@@ -183,37 +183,36 @@ class GitHubRepoSearchServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void shouldHandleEmptySearchResults() {
         LocalDate createdAfter = LocalDate.of(2020, 1, 1);
 
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of(
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
                 "repositoryCount", 0,
                 "edges", List.of(),
                 "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
-        )));
+        ));
 
         when(gitHubRestWebClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri(any(java.util.function.Function.class))).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri(any(Function.class))).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Map.of(
+        when(responseSpec.body(Map.class)).thenReturn(Map.of(
                 "total_count", 0,
                 "items", List.of()
-        )));
+        ));
 
         ScoringStrategy strategy = new DefaultScoringStrategy();
 
-        Mono<ScoredGitHubRepoSearchResponseDto> result =
+        ScoredGitHubRepoSearchResponseDto response =
                 service.searchAndScoreGitHubRepos(null, "Java", createdAfter, 10, null, strategy);
 
-        ScoredGitHubRepoSearchResponseDto response = result.block();
         assertNotNull(response);
         assertEquals(0, response.totalResultCount());
         assertTrue(response.githubRepositories().isEmpty());
     }
-
 
     @Test
     void shouldUseMaxPageSizeWhenFirstIsNull() {
@@ -222,12 +221,12 @@ class GitHubRepoSearchServiceTest {
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(eq("first"), eq(maxPageSize))).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of(
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
                 "repositoryCount", 0,
                 "edges", List.of(),
                 "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
-        )));
+        ));
 
         service.searchGitHubReposViaGraphQl(null, "Java", createdAfter, null, null);
 
@@ -242,12 +241,12 @@ class GitHubRepoSearchServiceTest {
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
         when(requestSpec.variable(eq("after"), eq(cursor))).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(Map.of(
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(Map.of(
                 "repositoryCount", 0,
                 "edges", List.of(),
                 "pageInfo", Map.of("hasNextPage", false, "hasPreviousPage", false)
-        )));
+        ));
 
         service.searchGitHubReposViaGraphQl(null, "Java", createdAfter, 10, cursor);
 

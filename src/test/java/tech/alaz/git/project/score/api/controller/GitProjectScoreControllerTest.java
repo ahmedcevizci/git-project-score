@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import reactor.core.publisher.Mono;
 import tech.alaz.git.project.score.api.controller.dto.ScoredGitHubRepoSearchResponseDto;
 import tech.alaz.git.project.score.api.controller.exception.CreationDateCannotBeInFutureException;
 import tech.alaz.git.project.score.api.controller.exception.PageSizeCannotExceedMaxValueException;
@@ -39,12 +38,12 @@ class GitProjectScoreControllerTest {
             "Test repository",
             "https://github.com/test/test-repo",
             "Java",
-            now.minus(365, ChronoUnit.DAYS), // created 1 year ago
-            updatedRecently,  // updated 30 days ago
-            updatedRecently,  // pushed 30 days ago
-            50,  // stars
-            10,  // watchers
-            25,  // forks
+            now.minus(365, ChronoUnit.DAYS),
+            updatedRecently,
+            updatedRecently,
+            50,
+            10,
+            25,
             false,
             false,
             false,
@@ -67,17 +66,15 @@ class GitProjectScoreControllerTest {
 
         when(gitHubRepoSearchService.searchAndScoreGitHubRepos(
                 any(), any(), any(LocalDate.class), anyInt(), any(), any()))
-                .thenReturn(Mono.just(expectedResponse));
+                .thenReturn(expectedResponse);
 
-        Mono<ScoredGitHubRepoSearchResponseDto> result = controller.searchAndScoreGitRepositories(
+        ScoredGitHubRepoSearchResponseDto result = controller.searchAndScoreGitRepositories(
                 "Java", creationDate, 3, null, "test"
         );
 
         assertNotNull(result);
-        ScoredGitHubRepoSearchResponseDto response = result.block();
-        assertNotNull(response);
-        assertEquals(1, response.totalResultCount());
-        assertEquals(expectedResponse, response);
+        assertEquals(1, result.totalResultCount());
+        assertEquals(expectedResponse, result);
     }
 
     @Test
@@ -110,10 +107,10 @@ class GitProjectScoreControllerTest {
 
         when(gitHubRepoSearchService.searchAndScoreGitHubRepos(
                 any(), any(), any(LocalDate.class), anyInt(), any(), any()))
-                .thenReturn(Mono.just(expectedResponse));
+                .thenReturn(expectedResponse);
 
-        Mono<ScoredGitHubRepoSearchResponseDto> result = controller.searchAndScoreGitRepositories("Java", creationDate, maxPageSize, null, "test");
+        ScoredGitHubRepoSearchResponseDto result = controller.searchAndScoreGitRepositories(
+                "Java", creationDate, maxPageSize, null, "test");
         assertNotNull(result);
-        assertDoesNotThrow(() -> result.block());
     }
 }

@@ -4,13 +4,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.server.ServerWebInputException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import tech.alaz.git.project.score.api.controller.exception.CreationDateCannotBeInFutureException;
 import tech.alaz.git.project.score.api.controller.exception.PageSizeCannotExceedMaxValueException;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class GlobalExceptionHandlerTest {
 
@@ -49,10 +53,24 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void shouldHandleServerWebInputException() {
-        ServerWebInputException exception = new ServerWebInputException("Invalid date format");
+    void shouldHandleMethodArgumentTypeMismatchException() {
+        MethodArgumentTypeMismatchException exception = mock(MethodArgumentTypeMismatchException.class);
+        when(exception.getName()).thenReturn("creationDate");
 
-        ResponseEntity<Map<String, Object>> response = handler.handleServerWebInputException(exception);
+        ResponseEntity<Map<String, Object>> response = handler.handleMethodArgumentTypeMismatchException(exception);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals(400, response.getBody().get("status"));
+        assertEquals("Invalid value for parameter 'creationDate'", response.getBody().get("message"));
+    }
+
+    @Test
+    void shouldHandleMissingServletRequestParameterException() {
+        MissingServletRequestParameterException exception =
+                new MissingServletRequestParameterException("language", "String");
+
+        ResponseEntity<Map<String, Object>> response = handler.handleMissingServletRequestParameterException(exception);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertNotNull(response.getBody());

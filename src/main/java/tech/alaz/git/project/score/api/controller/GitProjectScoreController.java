@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Mono;
 import tech.alaz.git.project.score.api.controller.dto.ScoredGitHubRepoSearchResponseDto;
 import tech.alaz.git.project.score.api.controller.exception.CreationDateCannotBeInFutureException;
 import tech.alaz.git.project.score.api.controller.exception.PageSizeCannotExceedMaxValueException;
@@ -34,7 +33,7 @@ public class GitProjectScoreController {
     }
 
     @GetMapping
-    public Mono<ScoredGitHubRepoSearchResponseDto> searchAndScoreGitRepositories(
+    public ScoredGitHubRepoSearchResponseDto searchAndScoreGitRepositories(
             @RequestParam String language,
             @RequestParam @DateTimeFormat(pattern = "dd-MM-yyyy") LocalDate creationDate,
             @RequestParam int pageSize,
@@ -54,9 +53,11 @@ public class GitProjectScoreController {
             throw new CreationDateCannotBeInFutureException("`creationDate` query parameter must be a valid date in the past");
         }
 
-        return gitHubRepoSearchService.searchAndScoreGitHubRepos(searchInNames, language, creationDate, pageSize, cursor, new DefaultScoringStrategy())
-                .doOnSuccess(response -> logger.info("Successfully completed search request: returned {} repositories out of {} total",
-                        response.githubRepositories().size(), response.totalResultCount()))
-                .doOnError(error -> logger.error("Error occurred during search and scoring", error));
+        ScoredGitHubRepoSearchResponseDto response = gitHubRepoSearchService.searchAndScoreGitHubRepos(
+                searchInNames, language, creationDate, pageSize, cursor, new DefaultScoringStrategy());
+
+        logger.info("Successfully completed search request: returned {} repositories out of {} total",
+                response.githubRepositories().size(), response.totalResultCount());
+        return response;
     }
 }

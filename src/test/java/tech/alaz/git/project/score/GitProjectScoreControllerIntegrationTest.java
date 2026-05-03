@@ -2,51 +2,41 @@ package tech.alaz.git.project.score;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.graphql.client.HttpGraphQlClient;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.graphql.client.GraphQlClient;
+import org.springframework.graphql.client.HttpSyncGraphQlClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.reactive.server.WebTestClient;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureWebTestClient
+@SpringBootTest(properties = "GITHUB_API_TOKEN=dummy-test-token")
+@AutoConfigureMockMvc
 class GitProjectScoreControllerIntegrationTest {
 
     @Autowired
-    private WebTestClient webTestClient;
+    private MockMvc mockMvc;
 
     @MockitoBean
-    private HttpGraphQlClient gitHubGraphQlClient;
+    private HttpSyncGraphQlClient gitHubGraphQlClient;
 
     @MockitoBean
-    private WebClient gitHubRestWebClient;
-
-    @MockitoBean
-    private HttpGraphQlClient.RequestSpec requestSpec;
-
-    @MockitoBean
-    private HttpGraphQlClient.RetrieveSpec retrieveSpec;
-
-    @MockitoBean
-    private WebClient.RequestHeadersUriSpec requestHeadersUriSpec;
-
-    @MockitoBean
-    private WebClient.RequestHeadersSpec requestHeadersSpec;
-
-    @MockitoBean
-    private WebClient.ResponseSpec responseSpec;
+    private RestClient gitHubRestWebClient;
 
     @Test
-    void shouldReturnSuccessfullyWithValidParameters() {
+    @SuppressWarnings("unchecked")
+    void shouldReturnSuccessfullyWithValidParameters() throws Exception {
         Map<String, Object> mockGraphQLResponse = Map.of(
                 "repositoryCount", 0,
                 "edges", List.of(),
@@ -59,81 +49,66 @@ class GitProjectScoreControllerIntegrationTest {
                 "items", List.of()
         );
 
+        GraphQlClient.RequestSpec requestSpec = mock(GraphQlClient.RequestSpec.class);
+        GraphQlClient.RetrieveSyncSpec retrieveSpec = mock(GraphQlClient.RetrieveSyncSpec.class);
+        @SuppressWarnings("rawtypes") RestClient.RequestHeadersUriSpec requestHeadersUriSpec = mock(RestClient.RequestHeadersUriSpec.class);
+        @SuppressWarnings("rawtypes") RestClient.RequestHeadersSpec requestHeadersSpec = mock(RestClient.RequestHeadersSpec.class);
+        RestClient.ResponseSpec responseSpec = mock(RestClient.ResponseSpec.class);
+
         when(gitHubGraphQlClient.document(anyString())).thenReturn(requestSpec);
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
-        when(requestSpec.retrieve(anyString())).thenReturn(retrieveSpec);
-        when(retrieveSpec.toEntity(Map.class)).thenReturn(Mono.just(mockGraphQLResponse));
+        when(requestSpec.retrieveSync(anyString())).thenReturn(retrieveSpec);
+        when(retrieveSpec.toEntity(Map.class)).thenReturn(mockGraphQLResponse);
 
         when(gitHubRestWebClient.get()).thenReturn(requestHeadersUriSpec);
-        when(requestHeadersUriSpec.uri(any(java.util.function.Function.class))).thenReturn(requestHeadersSpec);
+        when(requestHeadersUriSpec.uri(any(Function.class))).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(mockRestResponse));
+        when(responseSpec.body(Map.class)).thenReturn(mockRestResponse);
 
-        webTestClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/search")
-                        .queryParam("language", "Java")
-                        .queryParam("creationDate", "01-01-2020")
-                        .queryParam("pageSize", 3)
-                        .build())
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.totalResultCount").exists()
-                .jsonPath("$.maxStarGazersCount").exists()
-                .jsonPath("$.maxForkCount").exists();
+        mockMvc.perform(get("/api/search")
+                        .param("language", "Java")
+                        .param("creationDate", "01-01-2020")
+                        .param("pageSize", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalResultCount").exists())
+                .andExpect(jsonPath("$.maxStarGazersCount").exists())
+                .andExpect(jsonPath("$.maxForkCount").exists());
     }
 
     @Test
-    void shouldReturnBadRequestWhenPageSizeExceedsMax() {
-        webTestClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/search")
-                        .queryParam("language", "Java")
-                        .queryParam("creationDate", "01-01-2020")
-                        .queryParam("pageSize", 100)
-                        .build())
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.status").isEqualTo(400)
-                .jsonPath("$.message").exists();
+    void shouldReturnBadRequestWhenPageSizeExceedsMax() throws Exception {
+        mockMvc.perform(get("/api/search")
+                        .param("language", "Java")
+                        .param("creationDate", "01-01-2020")
+                        .param("pageSize", "100"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
-    void shouldReturnBadRequestWhenCreationDateIsInFuture() {
-        webTestClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/search")
-                        .queryParam("language", "Java")
-                        .queryParam("creationDate", "01-01-2030")
-                        .queryParam("pageSize", 3)
-                        .build())
-                .exchange()
-                .expectStatus().isBadRequest()
-                .expectBody()
-                .jsonPath("$.status").isEqualTo(400)
-                .jsonPath("$.message").exists();
+    void shouldReturnBadRequestWhenCreationDateIsInFuture() throws Exception {
+        mockMvc.perform(get("/api/search")
+                        .param("language", "Java")
+                        .param("creationDate", "01-01-2030")
+                        .param("pageSize", "3"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     @Test
-    void shouldReturnBadRequestWhenInvalidDateFormat() {
-        webTestClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/api/search")
-                        .queryParam("language", "Java")
-                        .queryParam("creationDate", "invalid-date")
-                        .queryParam("pageSize", 3)
-                        .build())
-                .exchange()
-                .expectStatus().isBadRequest();
+    void shouldReturnBadRequestWhenInvalidDateFormat() throws Exception {
+        mockMvc.perform(get("/api/search")
+                        .param("language", "Java")
+                        .param("creationDate", "invalid-date")
+                        .param("pageSize", "3"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
-    void shouldReturnBadRequestWhenRequiredParametersMissing() {
-        webTestClient.get()
-                .uri("/api/search")
-                .exchange()
-                .expectStatus().isBadRequest();
+    void shouldReturnBadRequestWhenRequiredParametersMissing() throws Exception {
+        mockMvc.perform(get("/api/search"))
+                .andExpect(status().isBadRequest());
     }
 }
