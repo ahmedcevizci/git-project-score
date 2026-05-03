@@ -4,7 +4,7 @@ A Spring Boot-based REST API service that searches GitHub repositories and score
 
 ## 📋 Overview
 
-Git Project Score is a reactive web service built with Spring WebFlux that:
+Git Project Score is a web service built with Spring WebMVC and Java Virtual Threads that:
 - Searches GitHub repositories using both GraphQL and REST APIs
 - Scores repositories based on multiple factors:
   - **Recency Score**: How recently the repository was updated
@@ -13,23 +13,24 @@ Git Project Score is a reactive web service built with Spring WebFlux that:
   - **Total Score**: Average of all individual scores
 - Provides paginated search results with cursor-based pagination
 - Supports filtering by programming language, creation date, and repository (partial or full) name
+- Uses Java Virtual Threads for concurrent GitHub API calls (GraphQL + REST run in parallel)
 
 ## 🏗️ Architecture
 
 ### Key Components
 
 - **GitProjectScoreController**: Main REST controller exposing the search endpoint
-- **GitHubRepoSearchService**: Orchestrates GitHub API calls and scoring
+- **GitHubRepoSearchService**: Orchestrates GitHub API calls and scoring using Virtual Threads for concurrent GraphQL + REST requests
 - **ScoringStrategy**: Interface for different scoring algorithms
   - `DefaultScoringStrategy`: Linear scoring based on relative metrics
-  - `NormalDistributionScoringStrategy`: Normal distribution-based scoring (planned)
+  - `NormalDistributionScoringStrategy`: Normal distribution-based scoring (not yet implemented)
 - **Response Mappers**: Convert GitHub API responses to domain objects
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Java 21 or higher
+- Java 25 or higher
 - Gradle 8.x
 - GitHub Personal Access Token (for API authentication)
 
@@ -85,7 +86,7 @@ Search for GitHub repositories with specific criteria and receive scored results
 | `creationDate` | Date | Yes | Minimum creation date (format: dd-MM-yyyy) | `01-01-2020` |
 | `pageSize` | Integer | Yes | Number of results per page (max: 10) | `5` |
 | `cursor` | String | No | Pagination cursor for next page | `Y3Vyc29yOjE=` |
-| `searchInNames` | String | No | Search term in repository names (max 10 chars) | `spring` |
+| `searchInNames` | String | No | Search term in repository names (max 20 chars) | `spring` |
 
 #### Example Request
 
@@ -319,24 +320,36 @@ The JAR will be created at: `build/libs/git-project-score-0.0.1-SNAPSHOT.jar`
 java -jar build/libs/git-project-score-0.0.1-SNAPSHOT.jar
 ```
 
+### Build Native Image (GraalVM)
+
+The project includes the GraalVM Native Build Tools plugin. To compile a native executable:
+
+```bash
+./gradlew nativeCompile
+```
+
+The native binary will be created at: `build/native/nativeCompile/git-project-score`
+
 ## 🛠️ Development
 
 ### Project Structure
 
-- **Language**: Java 21
-- **Framework**: Spring Boot 3.5.6
+- **Language**: Java 25
+- **Framework**: Spring Boot 4.0.6
 - **Build Tool**: Gradle (Kotlin DSL)
 - **Key Dependencies**:
-  - Spring WebFlux (Reactive Web)
-  - Spring GraphQL Client
+  - Spring WebMVC (blocking web with Virtual Threads)
+  - Spring GraphQL Client (`HttpSyncGraphQlClient`)
   - Apache Commons Math3 (Statistical calculations)
+  - Lombok (code generation)
   - JUnit 5 & Mockito (Testing)
+  - GraalVM Native Build Tools (native image support)
 
 ### Adding New Scoring Strategies
 
 1. Implement the `ScoringStrategy` interface:
 ```java
-public class NormalDistributionScoringStrategy implements ScoringStrategy {
+public class MyCustomScoringStrategy implements ScoringStrategy {
     @Override
     public boolean isRelativeToOtherProjects() {
         return true; // or false
@@ -344,10 +357,10 @@ public class NormalDistributionScoringStrategy implements ScoringStrategy {
 
     @Override
     public ScoreDto calculateScore(
-        GithubRepositoryDto repo,
-        Integer totalCount,
-        Integer maxForks,
-        Integer maxStars
+        GithubRepositoryDto githubRepositoryDto,
+        Integer totalMatchingRepoCount,
+        Integer maxForkCount,
+        Integer maxStarGazersCount
     ) {
         // New scoring logic here
     }
@@ -376,7 +389,7 @@ public class NormalDistributionScoringStrategy implements ScoringStrategy {
 - **Solution**: GitHub API has rate limits. Wait or use a token with higher limits
 
 **Issue**: Application fails to start
-- **Solution**: Ensure Java 21 is installed: `java -version`
+- **Solution**: Ensure Java 25 is installed: `java -version`
 
 ### Enable Debug Logging
 
